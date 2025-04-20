@@ -8,7 +8,12 @@ def setup_driver():
     chrome_options.add_argument("--headless")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
-    chrome_options.binary_location = shutil.which("chromium-browser") or "/usr/bin/chromium-browser"
 
-    service = Service(executable_path=shutil.which("chromedriver") or "/usr/bin/chromedriver")
+    # Get path to chromedriver
+    chromedriver_path = shutil.which("chromedriver")
+
+    if not chromedriver_path:
+        raise RuntimeError("Chromedriver not found in PATH!")
+
+    service = Service(executable_path=chromedriver_path)
     return webdriver.Chrome(service=service, options=chrome_options)
