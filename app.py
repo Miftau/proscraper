@@ -20,12 +20,10 @@ mail = Mail(app)
 DATA_DIR = os.path.join(os.getcwd(), "data")
 os.makedirs(DATA_DIR, exist_ok=True)
 
-@app.route("/", methods=["GET"])
+@app.route("/", methods=["GET", "POST"])
 def index():
-    return render_template("index.html", sites=SUPPORTED_WEBSITES.keys())
-
-@app.route("/scrape", methods=["POST"])
-def scrape():
+    if request.method != "POST":
+        return render_template("index.html", sites=SUPPORTED_WEBSITES.keys())
     keyword = request.form.get("keyword")
     region = request.form.get("region")
     website_key = request.form.get("site")
@@ -33,8 +31,8 @@ def scrape():
     custom_url = request.form.get("custom_url")
     custom_selector = request.form.get("custom_selector")
 
-    if not keyword or not region:
-        flash("Keyword and region are required!")
+    if not keyword or not region or not website_key:
+        flash("Keyword, region, and site are required!")
         return redirect(url_for("index"))
 
     if custom_url:
@@ -47,10 +45,6 @@ def scrape():
         site_url = site_info["url"]
 
     ads = scrape_ads(site_url, keyword, region, custom_selector)
-
-    if not ads:
-        flash("No ads found.")
-        return redirect(url_for("index"))
 
     # Save results
     csv_path = save_to_csv(ads, keyword, region, DATA_DIR)
