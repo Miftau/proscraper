@@ -1,20 +1,14 @@
-# scraper/driver_setup.py
-
 from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.chrome.service import Service as ChromeService
-from webdriver_manager.chrome import ChromeDriverManager
+import shutil
 
-def get_driver(headless=True):
+def setup_driver():
     chrome_options = Options()
-    if headless:
-        chrome_options.add_argument("--headless")
+    chrome_options.add_argument("--headless")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
-    chrome_options.add_argument("--disable-blink-features=AutomationControlled")
-    chrome_options.add_argument("--window-size=1920,1080")
-    chrome_options.add_argument("--disable-extensions")
+    chrome_options.binary_location = shutil.which("chromium-browser") or "/usr/bin/chromium-browser"
 
-    # Automatically download and use the appropriate chromedriver
-    driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()), options=chrome_options)
-    return driver
+    service = Service(executable_path=shutil.which("chromedriver") or "/usr/bin/chromedriver")
+    return webdriver.Chrome(service=service, options=chrome_options)
