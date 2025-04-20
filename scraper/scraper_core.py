@@ -1,31 +1,32 @@
-# scraper/core_scraper.py
-
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
 from selenium.common.exceptions import TimeoutException
 from time import sleep
-from scraper.parser import parse_olx_ads
+from bs4 import BeautifulSoup
+from scraper.parser import dispatch_parser
 
 def setup_driver():
     chrome_options = Options()
-    chrome_options.add_argument("--headless")  # Optional: run in headless mode
+    chrome_options.add_argument("--headless")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
+    return webdriver.Chrome(options=chrome_options)
 
-    driver = webdriver.Chrome(options=chrome_options)
-    return driver
-
-def scrape_ads(site_url, keyword, region, max_pages=3):
+def scrape_ads(site_url, keyword, region, parser_name=None, selector=None, max_pages=3):
     driver = setup_driver()
     all_ads = []
 
     try:
         for page in range(1, max_pages + 1):
-            search_url = f"{site_url}/{region}/?page={page}&q={keyword}&search[description]=1&search[dist]=0"
+            if "{region}" in site_url and "{keyword}" in site_url:
+                search_url = site_url.format(region=region, keyword=keyword, page=page)
+            else:
+                search_url = f"{site_url}?page={page}&q={keyword}"
+
             print(f"Scraping: {search_url}")
             driver.get(search_url)
-            sleep(3)  # Allow time for the page to fully load
+            sleep(3)
 
             # Accept cookies popup if present
             try:
@@ -33,14 +34,21 @@ def scrape_ads(site_url, keyword, region, max_pages=3):
                 consent_btn.click()
                 sleep(1)
             except:
-                pass  # If no popup, continue silently
+                pass
 
-            # Parse the ads using BeautifulSoup through parser.py
             page_source = driver.page_source
-            ads = parse_olx_ads(page_source)
+
+            # Use predefined parser if available
+            if parser_name:
+                parser_func = dispatch_parser(parser_name)
+                ads = parser_func(page_source)
+            elif selector:
+                ads = extract_generic_ads(page_source, selector)
+            else:
+                ads = []
 
             if not ads:
-                break  # No more ads found
+                break
 
             all_ads.extend(ads)
 
@@ -50,6 +58,22 @@ def scrape_ads(site_url, keyword, region, max_pages=3):
         driver.quit()
 
     return all_ads
+
+def extract_generic_ads(html, selector):
+    soup = BeautifulSoup(html, "html.parser")
+    elements = soup.select(selector)
+    ads = []
+
+    for el in elements:
+        text = el.get_text(strip=True)
+        link = el.find("a")["href"] if el.find("a") else "#"
+        ads.append({
+            "title": text,
+            "location": "N/A",
+            "link": link
+        })
+
+    return ads
 
 
 
