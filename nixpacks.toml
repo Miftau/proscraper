@@ -1,14 +1,13 @@
-# nixpacks.toml
-
 [phases.setup]
-nixpkgs = [
-  "python3Full",     # Includes pip
-  "chromium",        # Headless browser
-  "chromedriver"     # Selenium driver
-]
+nixpkgs = ["python3Full", "chromium", "chromedriver"]
 
 [phases.install]
-cmds = ["pip install --no-cache-dir -r requirements.txt"]
+cmds = [
+  "ln -s $(which python3) /usr/bin/python || true",
+  "ln -s $(which pip3) /usr/bin/pip || true",
+  "pip install --no-cache-dir -r requirements.txt"
+]
 
 [start]
 cmd = "gunicorn app:app --bind 0.0.0.0:$PORT"
+
