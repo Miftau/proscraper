@@ -207,8 +207,7 @@ def parse_bestbuy_ads(html):
     soup = BeautifulSoup(html, "html.parser")
     ads = []
     for item in soup.select("li.sku-item"):
-        title = item.select_one("h4.sku-header a")
-        if title:
+        if title := item.select_one("h4.sku-header a"):
             ads.append({
                 "title": title.get_text(strip=True),
                 "location": "BestBuy",
