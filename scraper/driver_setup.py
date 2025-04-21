@@ -1,19 +1,19 @@
 from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
-import shutil
+from selenium.webdriver.chrome.service import Service as ChromeService
+from webdriver_manager.chrome import ChromeDriverManager
 
-def setup_driver():
+def get_driver(headless=True):
     chrome_options = Options()
-    chrome_options.add_argument("--headless")
+    if headless:
+        chrome_options.add_argument("--headless")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
+    chrome_options.add_argument("--disable-blink-features=AutomationControlled")
+    chrome_options.add_argument("--window-size=1920,1080")
+    chrome_options.add_argument("--disable-extensions")
 
-    # Get path to chromedriver
-    chromedriver_path = shutil.which("chromedriver")
-
-    if not chromedriver_path:
-        raise RuntimeError("Chromedriver not found in PATH!")
-
-    service = Service(executable_path=chromedriver_path)
-    return webdriver.Chrome(service=service, options=chrome_options)
+    return webdriver.Chrome(
+        service=ChromeService(ChromeDriverManager().install()),
+        options=chrome_options,
+    )

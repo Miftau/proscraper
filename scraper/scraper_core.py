@@ -1,79 +1,81 @@
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
-from selenium.common.exceptions import TimeoutException
+from selenium.common.exceptions import TimeoutException, WebDriverException
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 from time import sleep
-from bs4 import BeautifulSoup
-from scraper.parser import dispatch_parser
+from urllib.parse import urljoin
+from scraper.parser import parse_generic_ads
+
 
 def setup_driver():
     chrome_options = Options()
-    chrome_options.add_argument("--headless")
+    chrome_options.add_argument("--headless")  # Headless mode for servers
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
-    return webdriver.Chrome(options=chrome_options)
+    chrome_options.page_load_strategy = 'eager'
+    chrome_options.add_argument("--log-level=3")
 
-def scrape_ads(site_url, keyword, region, parser_name=None, selector=None, max_pages=3):
+    driver = webdriver.Chrome(options=chrome_options)
+    driver.set_page_load_timeout(600)
+    return driver
+
+
+def scrape_ads(start_url, keyword, custom_selector=None, max_pages=3):
     driver = setup_driver()
     all_ads = []
+    seen_urls = set()
+    page_url = start_url
 
     try:
-        for page in range(1, max_pages + 1):
-            if "{region}" in site_url and "{keyword}" in site_url:
-                search_url = site_url.format(region=region, keyword=keyword, page=page)
-            else:
-                search_url = f"{site_url}?page={page}&q={keyword}"
+        for page in range(max_pages):
+            if not page_url or page_url in seen_urls:
+                break
+            seen_urls.add(page_url)
 
-            print(f"Scraping: {search_url}")
-            driver.get(search_url)
-            sleep(3)
-
-            # Accept cookies popup if present
+            print(f"[Scraping] {page_url}")
             try:
-                consent_btn = driver.find_element(By.XPATH, "//button[contains(text(), 'Akceptuję')]")
-                consent_btn.click()
+                driver.get(page_url)
+            except TimeoutException:
+                print(f"[Timeout] {page_url}")
+                continue
+
+            sleep(4)
+
+            # Handle cookie/consent popups
+            try:
+                consent = WebDriverWait(driver, 5).until(
+                    EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'Accept') or contains(text(), 'Akceptuję')]"))
+                )
+                consent.click()
                 sleep(1)
             except:
                 pass
 
             page_source = driver.page_source
 
-            # Use predefined parser if available
-            if parser_name:
-                parser_func = dispatch_parser(parser_name)
-                ads = parser_func(page_source)
-            elif selector:
-                ads = extract_generic_ads(page_source, selector)
-            else:
-                ads = []
+            parsed = parse_generic_ads(page_source, base_url=page_url, custom_selector=custom_selector, keyword=keyword)
+            ads = parsed.get("ads", [])
 
             if not ads:
+                print(f"[Info] No ads found on page {page + 1}")
                 break
 
             all_ads.extend(ads)
 
-    except TimeoutException:
-        print("Timeout while loading the page.")
+            # Handle pagination (from parser)
+            next_url = parsed.get("next_page_url")
+            if not next_url:
+                print("[Pagination] No next page link found.")
+                break
+
+            page_url = urljoin(page_url, next_url)
+
+    except WebDriverException as e:
+        print(f"[WebDriver Error] {e}")
     finally:
         driver.quit()
 
     return all_ads
-
-def extract_generic_ads(html, selector):
-    soup = BeautifulSoup(html, "html.parser")
-    elements = soup.select(selector)
-    ads = []
-
-    for el in elements:
-        text = el.get_text(strip=True)
-        link = el.find("a")["href"] if el.find("a") else "#"
-        ads.append({
-            "title": text,
-            "location": "N/A",
-            "link": link
-        })
-
-    return ads
-
-
 
